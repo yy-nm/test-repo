@@ -25,6 +25,7 @@
 #include <sys/epoll.h>
 #include <errno.h>
 #include <err.h>
+#include <pthread.h>
 
 typedef struct sockaddr_in SOCKADDR;
 typedef struct in_addr INADDR;
@@ -46,6 +47,11 @@ typedef struct multi_tunnel_tcp {
 	SOCKADDR remotes[MAXPORTCOUNT];
 	int tun_fd;
 } multi_tunnel_tcp_t;
+
+typedef struct epoll_stuff {
+	int epoll_fd;
+	multi_tunnel_tcp_t *path;
+} epoll_stuff_t;
 
 
 void close_port(int *, int);
@@ -88,10 +94,12 @@ void tun_to_net(multi_tunnel_tcp_t *path)
 			exit(20);
 		}
 	}
-	/*fprintf(stdout, "need send to %s:%d, size: %ld\n"*/
-			/*, inet_ntoa(addr->sin_addr)*/
-			/*, ntohs(addr->sin_port)*/
-			/*,ret_read);*/
+#ifdef DEBUG
+	fprintf(stdout, "need send to %s:%d, size: %ld\n"
+			, inet_ntoa(addr->sin_addr)
+			, ntohs(addr->sin_port)
+			,ret_read);
+#endif
 	/*write(STDOUT_FILENO, buf, ret_read);*/
 	for (;;) {
 		ret_send = sendto(net_fd, buf, ret_read, 0
@@ -132,10 +140,12 @@ void net_to_tun(multi_tunnel_tcp_t *path, int recv_fd)
 			return;
 		}
 	}
-	/*fprintf(stdout, "recv from %s:%d, size: %ld\n"*/
-			/*, inet_ntoa(sock_addr.sin_addr)*/
-			/*, ntohs(sock_addr.sin_port)*/
-			/*, retn);*/
+#ifdef DEBUG
+	fprintf(stdout, "recv from %s:%d, size: %ld\n"
+			, inet_ntoa(sock_addr.sin_addr)
+			, ntohs(sock_addr.sin_port)
+			, retn);
+#endif
 	/*write(STDOUT_FILENO, buf, retn);*/
 	for (;;) {
 		ret = write(tun_fd, buf, retn);
@@ -193,6 +203,19 @@ int set_non_block_fd(int fd)
 	return 0;
 }
 
+
+void * thread_epoll_recv(void *data)
+{
+	epoll_stuff_t *epoll_data = (epoll_stuff_t *)data;
+	if (NULL == epoll_data) {
+		fprintf(stderr, "epoll recv thread have not data\n");
+		exit(10001);
+	}
+	forward(epoll_data->epoll_fd, epoll_data->path);
+	fprintf(stdout, "epoll recv thread exit\n");
+	pthread_exit(data);
+}
+
 void start_forward(multi_tunnel_tcp_t *path)
 {
 	int i;
@@ -211,15 +234,12 @@ void start_forward(multi_tunnel_tcp_t *path)
 	/*}*/
 	struct epoll_event event;
 	int epoll_fd;
+	pthread_t thread_id;
+	epoll_stuff_t epoll_data;
+	
 
 	if (-1 == (epoll_fd = epoll_create1(0))) {
 		perror("create epoll fd error");
-		exit(4);
-	}
-	event.data.fd = path->tun_fd;
-	event.events = EPOLLIN;
-	if (-1 == epoll_ctl(epoll_fd, EPOLL_CTL_ADD, path->tun_fd, &event)) {
-		perror("epoll ctl add error");
 		exit(4);
 	}
 
@@ -233,8 +253,26 @@ void start_forward(multi_tunnel_tcp_t *path)
 		}
 	}
 
+	epoll_data.path = path;
+	epoll_data.epoll_fd = epoll_fd;
+	pthread_create(&thread_id, NULL, thread_epoll_recv
+			, (void *)&epoll_data);
+
+	if (-1 == (epoll_fd = epoll_create1(0))) {
+		perror("create epoll fd error");
+		exit(4);
+	}
+	event.data.fd = path->tun_fd;
+	event.events = EPOLLIN;
+	if (-1 == epoll_ctl(epoll_fd, EPOLL_CTL_ADD, path->tun_fd, &event)) {
+		perror("epoll ctl add error");
+		exit(4);
+	}
+
+	// leave recv tun and send data to net in main thread
 	forward(epoll_fd, path);
 	close(epoll_fd);
+	pthread_cancel(thread_id);
 }
 
 void ifconfig(const char *ifname, const char *src_addr, const char *dst_addr)
