@@ -88,10 +88,10 @@ void tun_to_net(multi_tunnel_tcp_t *path)
 			exit(20);
 		}
 	}
-	fprintf(stdout, "need send to %s:%d, size: %ld\n"
-			, inet_ntoa(addr->sin_addr)
-			, ntohs(addr->sin_port)
-			,ret_read);
+	/*fprintf(stdout, "need send to %s:%d, size: %ld\n"*/
+			/*, inet_ntoa(addr->sin_addr)*/
+			/*, ntohs(addr->sin_port)*/
+			/*,ret_read);*/
 	/*write(STDOUT_FILENO, buf, ret_read);*/
 	for (;;) {
 		ret_send = sendto(net_fd, buf, ret_read, 0
@@ -132,10 +132,10 @@ void net_to_tun(multi_tunnel_tcp_t *path, int recv_fd)
 			return;
 		}
 	}
-	fprintf(stdout, "recv from %s:%d, size: %ld\n"
-			, inet_ntoa(sock_addr.sin_addr)
-			, ntohs(sock_addr.sin_port)
-			, retn);
+	/*fprintf(stdout, "recv from %s:%d, size: %ld\n"*/
+			/*, inet_ntoa(sock_addr.sin_addr)*/
+			/*, ntohs(sock_addr.sin_port)*/
+			/*, retn);*/
 	/*write(STDOUT_FILENO, buf, retn);*/
 	for (;;) {
 		ret = write(tun_fd, buf, retn);
