@@ -33,8 +33,8 @@ typedef struct in_addr INADDR;
 #define MAXADDRCOUNT 20
 #define MAXPORTCOUNT 20
 #define IP_LENGTH 129
-// must large than mtu
-#define MAX_PACKAGE_SZ 1500
+// must large than mtu(default: 1500)
+#define MAX_PACKAGE_SZ 3000
 
 typedef struct multi_tunnel_tcp {
 	INADDR remote;
@@ -128,18 +128,21 @@ void net_to_tun(multi_tunnel_tcp_t *path, int recv_fd)
 	int ret;
 	SOCKADDR sock_addr;
 	socklen_t addr_len = sizeof(sock_addr);
-	n = retn = 0;
-	retn = recvfrom(net_fd, buf, MAX_PACKAGE_SZ, 0
-			, (struct sockaddr *)&sock_addr
-			, &addr_len);
-	if (retn == -1) {
-		if (EAGAIN != errno && EWOULDBLOCK != errno) {
-			perror("recvfrom error");
-			exit(10);
-		} else {
-			return;
+	retn = 0;
+	n = MAX_PACKAGE_SZ;
+	/*for (;;) {*/
+		retn = recvfrom(net_fd, buf, MAX_PACKAGE_SZ, 0
+				, (struct sockaddr *)&sock_addr
+				, &addr_len);
+		if (retn == -1) {
+			if (EAGAIN != errno && EWOULDBLOCK != errno) {
+				perror("recvfrom error");
+				exit(10);
+			} else {
+				return;
+			}
 		}
-	}
+	/*}*/
 #ifdef DEBUG
 	fprintf(stdout, "recv from %s:%d, size: %ld\n"
 			, inet_ntoa(sock_addr.sin_addr)
@@ -245,7 +248,7 @@ void start_forward(multi_tunnel_tcp_t *path)
 
 	for (i = 0; i < path->local_count; ++i) {
 		event.data.fd = path->local_fds[i];
-		event.events = EPOLLIN;
+		event.events = EPOLLIN || EPOLLET;
 		if (-1 == epoll_ctl(epoll_fd, EPOLL_CTL_ADD
 					, path->local_fds[i], &event)) {
 			perror("epoll ctl add error");
@@ -263,7 +266,7 @@ void start_forward(multi_tunnel_tcp_t *path)
 		exit(4);
 	}
 	event.data.fd = path->tun_fd;
-	event.events = EPOLLIN;
+	event.events = EPOLLIN || EPOLLET;
 	if (-1 == epoll_ctl(epoll_fd, EPOLL_CTL_ADD, path->tun_fd, &event)) {
 		perror("epoll ctl add error");
 		exit(4);
