@@ -142,6 +142,8 @@ void net_to_tun(multi_tunnel_tcp_t *path, int recv_fd)
 				fprintf(stderr, "write to tun will block");
 				break;
 			} else {
+				fprintf(stderr, "fd: %d len: %ld\n"
+						, tun_fd, retn);
 				perror("write to tun error");
 				exit(11);
 			}
@@ -176,25 +178,35 @@ void forward(int efd, multi_tunnel_tcp_t *path)
 
 }
 		
+int set_non_block_fd(int fd)
+{
+	int flags = fcntl(fd, F_GETFL, 0);
+	if (-1 == flags) {
+		return flags;
+	}
+	flags |= O_NONBLOCK;
+	if (-1 == fcntl(fd, F_SETFL, flags)) {
+		return -1;
+	}
+	return 0;
+}
 
 void start_forward(multi_tunnel_tcp_t *path)
 {
-	int flags;
 	int i;
 	for (i = 0; i < path->local_count; ++i) {
-		flags = fcntl(path->local_fds[i], F_GETFL, 0);
-		if (-1 == flags) {
-			perror("get fl error");
+		if (set_non_block_fd(path->local_fds[i]) == -1) {
+			perror("set non block error");
 			close_port(path->local_fds, path->local_count);
 			exit(2);
 		}
-		flags |= O_NONBLOCK;
-		if (-1 == fcntl(path->local_fds[i], F_SETFL, flags)) {
-			perror("set fl error");
-			close_port(path->local_fds, path->local_count);
-			exit(3);
-		}
 	}
+	// tun_fd is not socket fd, cannot set nonblock
+	/*if (-1 == set_non_block_fd(path->tun_fd)) {*/
+		/*perror("set tun non block error");*/
+		/*close_port(path->local_fds, path->local_count);*/
+		/*exit(4);*/
+	/*}*/
 	struct epoll_event event;
 	int epoll_fd;
 
