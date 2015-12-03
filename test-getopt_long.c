@@ -36,9 +36,15 @@ int main(int argc, char **args)
 		{"ddd", required_argument, 0, 'd'},
 		{0, 0, 0, 0}
 	};
-	int op;
-	while (0 <= (op =  getopt_long(argc, args, "0:1", opts, 0))) {
-		fprintf(stdout, "key %d, value: %s\n", op, optarg);
+	int op = 0;
+	int index = -1;
+	while (0 <= (op =  getopt_long(argc, args, "0:1", opts, &index))) {
+		fprintf(stdout, "key %d, value: %s, index: %d\n", op
+				, optarg, index);
+		/*
+		 * if donot match opts elements, index value will not be changed
+		 *	, it will keep last value
+		 * */
 	}
 
 	return 0;
