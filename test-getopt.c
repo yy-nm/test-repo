@@ -22,11 +22,13 @@ int main(int argc, char **args)
 	 * params:
 	 *	without arg: -a, -b -e
 	 *	with arg: -c, -d, -f
-	 * if character of optstring with ':'(colon) behind means params with 
-	 * arg
-	 *
+	 * if character of optstring with ':'(colon) or '?' behind means params
+	 * with arg
+	 * use ? if without args op='param', optarg=NULL
+	 * use : if without args have error msg send to stderr, op='?',
+	 *	optarg=NULL
 	 * */
-	while(0 <= (op = getopt(argc, args, "abc:d:ef:"))) {
+	while(0 <= (op = getopt(argc, args, "abc?d:ef:"))) {
 		fprintf(stdout, "key: %c value: %s\n", op, optarg);
 	}
 
